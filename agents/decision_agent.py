@@ -1,32 +1,27 @@
 from state.loan_state import LoanState
 
 def decision_agent(state: LoanState) -> LoanState:
-    """
-    Combines risk tier, fraud score, and verification
-    confidence to make a final decision.
-    """
-    income = state["ocr_extracted_income"] or state["stated_income"]
-    emi = state["emi"]
     employment = state["employment_type"]
     risk_tier = state["risk_tier"]
     fraud_score = state["fraud_score"]
     verification_confidence = state["verification_confidence"]
 
-    # Escalate to manual review if fraud score is high or confidence is low
+    # Check employment type first — hard rejection, no escalation
+    if employment != "salaried":
+        state["decision"] = "Rejected"
+        state["reason"] = "Only salaried applicants are eligible."
+        return state
+
+    # Escalate to manual review if fraud score is high
     if fraud_score >= 0.6:
         state["decision"] = "Manual Review"
         state["reason"] = f"High fraud score of {fraud_score:.0%}. Flags: {', '.join(state['fraud_flags'])}"
         return state
 
-    if verification_confidence < 0.5:
+    # Escalate if verification confidence is too low
+    if verification_confidence <= 0.5:
         state["decision"] = "Manual Review"
         state["reason"] = f"Low verification confidence. Flags: {', '.join(state['verification_flags'])}"
-        return state
-
-    # Reject non-salaried applicants
-    if employment != "salaried":
-        state["decision"] = "Rejected"
-        state["reason"] = "Only salaried applicants are eligible."
         return state
 
     # Decision based on risk tier

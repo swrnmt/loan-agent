@@ -17,6 +17,13 @@ class LoanApplication(Base):
     employment_type = Column(String)
     ocr_extracted_income = Column(Float)
     ocr_confidence = Column(Float)
+    income_match = Column(String)
+    income_mismatch_pct = Column(Float)
+    verification_confidence = Column(Float)
+    debt_to_income_ratio = Column(Float)
+    emi_burden_pct = Column(Float)
+    risk_tier = Column(String)
+    fraud_score = Column(Float)
     emi = Column(Float)
     decision = Column(String)
     reason = Column(String)
@@ -28,13 +35,20 @@ def init_db():
 def save_application(state: dict):
     session = Session()
     record = LoanApplication(
-        applicant_name=state["applicant_name"],
-        stated_income=state["stated_income"],
-        loan_amount=state["loan_amount"],
-        loan_tenure_months=state["loan_tenure_months"],
-        employment_type=state["employment_type"],
+        applicant_name=state.get("applicant_name"),
+        stated_income=state.get("stated_income"),
+        loan_amount=state.get("loan_amount"),
+        loan_tenure_months=state.get("loan_tenure_months"),
+        employment_type=state.get("employment_type"),
         ocr_extracted_income=state.get("ocr_extracted_income"),
         ocr_confidence=state.get("ocr_confidence"),
+        income_match=str(state.get("income_match")),
+        income_mismatch_pct=state.get("income_mismatch_pct"),
+        verification_confidence=state.get("verification_confidence"),
+        debt_to_income_ratio=state.get("debt_to_income_ratio"),
+        emi_burden_pct=state.get("emi_burden_pct"),
+        risk_tier=state.get("risk_tier"),
+        fraud_score=state.get("fraud_score"),
         emi=state.get("emi"),
         decision=state.get("decision"),
         reason=state.get("reason"),
@@ -45,6 +59,8 @@ def save_application(state: dict):
 
 def get_all_applications():
     session = Session()
-    records = session.query(LoanApplication).order_by(LoanApplication.created_at.desc()).all()
+    records = session.query(LoanApplication).order_by(
+        LoanApplication.created_at.desc()
+    ).all()
     session.close()
     return records
