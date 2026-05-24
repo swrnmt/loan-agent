@@ -32,3 +32,5 @@ class LoanState(TypedDict):
     emi: Optional[float]
     decision: Optional[str]  # "Approved", "Rejected", "Manual Review"
     reason: Optional[str]
+
+    report_pdf: Optional[bytes]

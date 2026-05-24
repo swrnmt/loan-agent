@@ -34,7 +34,7 @@ if st.button("Submit Application"):
     if loan_amount <= 0:
         errors.append("Loan amount must be greater than 0.")
     if loan_amount > 50000000:
-        errors.append("Loan amount cannot exceed ₹5 crore.")
+        errors.append("Loan amount cannot exceed Rs. 5 crore.")
     if not uploaded_file:
         errors.append("Please upload your salary slip PDF.")
 
@@ -109,8 +109,18 @@ if st.button("Submit Application"):
 
             st.markdown(f"**Decision Agent:** Final decision: **{result['decision']}**. {result['reason']}")
 
+            # --- Download Report ---
+            if result.get("report_pdf"):
+                st.download_button(
+                    label="📄 Download Audit Report (PDF)",
+                    data=result["report_pdf"],
+                    file_name=f"loan_report_{result['applicant_name'].replace(' ', '_')}.pdf",
+                    mime="application/pdf"
+                )
+
+            # --- Full State ---
             with st.expander("See full application state"):
-                display_state = {k: v for k, v in result.items() if k != "pdf_bytes"}
+                display_state = {k: v for k, v in result.items() if k != "pdf_bytes" and k != "report_pdf"}
                 st.json(display_state)
 
         except Exception as e:
