@@ -4,7 +4,9 @@ from PIL import Image
 import io
 import re
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+import os
+if os.name == 'nt':  # Only set this on Windows
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 from state.loan_state import LoanState
 
