@@ -2,7 +2,6 @@ import streamlit as st
 from main import run_pipeline
 from database import init_db, save_application, get_all_applications
 
-# Initialize the database on startup
 init_db()
 
 st.set_page_config(page_title="Loan Application Agent", page_icon="🏦")
@@ -46,6 +45,8 @@ if st.button("Submit Application"):
 
         if result["decision"] == "Approved":
             st.success(f"✅ {result['decision']}")
+        elif result["decision"] == "Manual Review":
+            st.warning(f"⚠️ {result['decision']} Required")
         else:
             st.error(f"❌ {result['decision']}")
 
@@ -58,15 +59,42 @@ if st.button("Submit Application"):
 
         # --- Audit Trail ---
         st.subheader("Audit Trail")
-        st.markdown(f"""
-**Intake Agent:** Received application from {result['applicant_name']}. Stated income ₹{result['stated_income']:,.0f}, loan request ₹{result['loan_amount']:,.0f} over {result['loan_tenure_months']} months.
 
-**OCR Agent:** {'Extracted income of ₹' + f"{result['ocr_extracted_income']:,.0f}" + f" from salary slip (confidence: {result['ocr_confidence']:.0%})." if result['ocr_extracted_income'] else 'Could not extract income from salary slip. Falling back to stated income.'}
+        st.markdown(f"**Intake Agent:** Received application from {result['applicant_name']}. "
+                    f"Stated income ₹{result['stated_income']:,.0f}, "
+                    f"loan request ₹{result['loan_amount']:,.0f} over {result['loan_tenure_months']} months.")
 
-**Decision Agent:** Calculated EMI of ₹{result['emi']:,.0f}/month. Applied 3x income rule. Decision: **{result['decision']}**. {result['reason']}
-        """)
+        if result["ocr_extracted_income"]:
+            st.markdown(f"**OCR Agent:** Extracted income of ₹{result['ocr_extracted_income']:,.0f} "
+                        f"from salary slip (confidence: {result['ocr_confidence']:.0%}).")
+        else:
+            st.markdown("**OCR Agent:** Could not extract income from salary slip.")
 
-        # --- Full State (for debugging) ---
+        if result["income_match"]:
+            st.markdown(f"**Verification Agent:** Income verified. "
+                        f"Stated and extracted income match within {result['income_mismatch_pct']:.1f}%. "
+                        f"Confidence: {result['verification_confidence']:.0%}.")
+        else:
+            flags = ", ".join(result["verification_flags"]) if result["verification_flags"] else "None"
+            st.markdown(f"**Verification Agent:** Income mismatch detected. "
+                        f"Mismatch: {result['income_mismatch_pct']:.1f}%. "
+                        f"Flags: {flags}. Confidence: {result['verification_confidence']:.0%}.")
+
+        st.markdown(f"**Risk Agent:** Debt-to-income ratio: {result['debt_to_income_ratio']:.2f}. "
+                    f"EMI burden: {result['emi_burden_pct']:.1f}% of income. "
+                    f"Risk tier: **{result['risk_tier']}**.")
+
+        if result["fraud_flags"]:
+            flags = ", ".join(result["fraud_flags"])
+            st.markdown(f"**Fraud Agent:** {len(result['fraud_flags'])} flag(s) detected. "
+                        f"Fraud score: {result['fraud_score']:.0%}. Flags: {flags}.")
+        else:
+            st.markdown(f"**Fraud Agent:** No suspicious patterns detected. "
+                        f"Fraud score: {result['fraud_score']:.0%}.")
+
+        st.markdown(f"**Decision Agent:** Final decision: **{result['decision']}**. {result['reason']}")
+
+        # --- Full State ---
         with st.expander("See full application state"):
             display_state = {k: v for k, v in result.items() if k != "pdf_bytes"}
             st.json(display_state)
@@ -81,6 +109,7 @@ if records:
         "Income": f"₹{r.stated_income:,.0f}",
         "Loan": f"₹{r.loan_amount:,.0f}",
         "EMI": f"₹{r.emi:,.0f}" if r.emi else "-",
+        "Risk": r.risk_tier if hasattr(r, 'risk_tier') else "-",
         "Decision": r.decision,
         "Time": r.created_at.strftime("%d %b %Y, %H:%M")
     } for r in records]
