@@ -4,27 +4,73 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from datetime import datetime
+from dotenv import load_dotenv
+import requests
 import io
+import os
 
 from state.loan_state import LoanState
 
+load_dotenv()
+
 def report_agent(state: LoanState) -> LoanState:
-    """
-    Generates a PDF audit report from the final state.
-    Stores the PDF bytes in state["report_pdf"].
-    """
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4,
                             rightMargin=0.75*inch, leftMargin=0.75*inch,
                             topMargin=0.75*inch, bottomMargin=0.75*inch)
-    styles = getSampleStyleSheet()
     story = []
 
-    # --- Header ---
+    # --- LLM Explanation via Groq API ---
+    try:
+        api_key = os.getenv("GROQ_API_KEY")
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"""You are a senior loan officer writing a brief explanation for a loan decision.
+Write 2-3 sentences explaining this decision in simple, professional language.
+Do not use bullet points. Be direct and human.
+
+Applicant: {state['applicant_name']}
+Income: Rs. {state['stated_income']:,.0f}
+Loan Amount: Rs. {state['loan_amount']:,.0f}
+EMI Burden: {state['emi_burden_pct']:.1f}% of income
+Risk Tier: {state['risk_tier']}
+Fraud Score: {state['fraud_score']:.0%}
+Decision: {state['decision']}
+Reason: {state['reason']}"""
+                    }
+                ],
+                "max_tokens": 200
+            },
+            timeout=10
+        )
+        llm_explanation = response.json()["choices"][0]["message"]["content"]
+
+    except Exception as e:
+        print(f"Groq error: {e}")
+        llm_explanation = state['reason']
+
+    # --- Styles ---
+    section_style = ParagraphStyle('section', fontSize=12, fontName='Helvetica-Bold',
+                                    spaceBefore=12, spaceAfter=6)
     header_style = ParagraphStyle('header', fontSize=18, fontName='Helvetica-Bold',
                                    alignment=1, spaceAfter=4)
     sub_style = ParagraphStyle('sub', fontSize=10, fontName='Helvetica',
                                 alignment=1, spaceAfter=20, textColor=colors.grey)
+    reason_style = ParagraphStyle('reason', fontSize=10, fontName='Helvetica',
+                                   spaceAfter=6, leading=16)
+    footer_style = ParagraphStyle('footer', fontSize=8, alignment=1,
+                                   textColor=colors.grey)
+
+    # --- Header ---
     story.append(Paragraph("LOAN APPLICATION AUDIT REPORT", header_style))
     story.append(Paragraph(f"Generated on {datetime.now().strftime('%d %B %Y, %H:%M')}", sub_style))
 
@@ -51,10 +97,7 @@ def report_agent(state: LoanState) -> LoanState:
     story.append(Spacer(1, 0.2*inch))
 
     # --- Applicant Details ---
-    section_style = ParagraphStyle('section', fontSize=12, fontName='Helvetica-Bold',
-                                    spaceBefore=12, spaceAfter=6)
     story.append(Paragraph("Applicant Details", section_style))
-
     applicant_data = [
         ['Field', 'Value'],
         ['Applicant Name', state['applicant_name']],
@@ -72,7 +115,6 @@ def report_agent(state: LoanState) -> LoanState:
         ('FONTNAME', (0,1), (0,-1), 'Helvetica-Bold'),
         ('FONTNAME', (1,1), (1,-1), 'Helvetica'),
         ('FONTSIZE', (0,0), (-1,-1), 10),
-        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#f8f9fa')),
         ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#f8f9fa')]),
         ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
         ('PADDING', (0,0), (-1,-1), 8),
@@ -81,7 +123,6 @@ def report_agent(state: LoanState) -> LoanState:
 
     # --- Verification Results ---
     story.append(Paragraph("Verification & Risk Assessment", section_style))
-
     ocr_income = f"Rs. {state['ocr_extracted_income']:,.0f}" if state['ocr_extracted_income'] else "Could not extract"
     match_status = "Match" if state['income_match'] else "Mismatch"
     mismatch = f"{state['income_mismatch_pct']:.1f}%" if state['income_mismatch_pct'] is not None else "N/A"
@@ -111,7 +152,6 @@ def report_agent(state: LoanState) -> LoanState:
 
     # --- Fraud Assessment ---
     story.append(Paragraph("Fraud Assessment", section_style))
-
     fraud_flags = state['fraud_flags'] if state['fraud_flags'] else ["No suspicious patterns detected"]
     fraud_data = [['Fraud Score', f"{state['fraud_score']:.0%}"]]
     for i, flag in enumerate(fraud_flags):
@@ -130,17 +170,15 @@ def report_agent(state: LoanState) -> LoanState:
     ]))
     story.append(fraud_table)
 
-    # --- Decision Reason ---
+    # --- Decision Summary ---
     story.append(Paragraph("Decision Summary", section_style))
-    reason_style = ParagraphStyle('reason', fontSize=10, fontName='Helvetica',
-                                   spaceAfter=6, leading=16)
     story.append(Paragraph(f"<b>Decision:</b> {state['decision']}", reason_style))
     story.append(Paragraph(f"<b>Reason:</b> {state['reason']}", reason_style))
+    story.append(Spacer(1, 0.1*inch))
+    story.append(Paragraph(f"<b>Officer Notes:</b> {llm_explanation}", reason_style))
 
     # --- Footer ---
     story.append(Spacer(1, 0.3*inch))
-    footer_style = ParagraphStyle('footer', fontSize=8, alignment=1,
-                                   textColor=colors.grey)
     story.append(Paragraph(
         "This is a system-generated audit report. "
         "All decisions are based on automated analysis and are subject to human review.",
