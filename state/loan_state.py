@@ -8,6 +8,9 @@ class LoanState(TypedDict):
     loan_tenure_months: int
     employment_type: str
 
+    # PDF bytes stored here so OCR agent can access it via state
+    pdf_bytes: Optional[bytes]
+
     # OCR Agent fills these
     ocr_extracted_income: Optional[float]
     ocr_confidence: Optional[float]

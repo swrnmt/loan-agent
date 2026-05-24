@@ -8,7 +8,8 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 
 from state.loan_state import LoanState
 
-def ocr_agent(state: LoanState, pdf_bytes: bytes) -> LoanState:
+def ocr_agent(state: LoanState) -> LoanState:
+    pdf_bytes = state["pdf_bytes"]
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     full_text = ""
 
@@ -20,9 +21,6 @@ def ocr_agent(state: LoanState, pdf_bytes: bytes) -> LoanState:
             pix = page.get_pixmap(dpi=200)
             img = Image.open(io.BytesIO(pix.tobytes("png")))
             full_text += pytesseract.image_to_string(img)
-
-    # Uncomment this line temporarily to see what text is being extracted:
-    # print("EXTRACTED TEXT:\n", full_text)
 
     patterns = [
         r"(?:net\s*pay|monthly\s*income)[^\d]{0,20}INR\s*([\d,]+)",
@@ -37,7 +35,6 @@ def ocr_agent(state: LoanState, pdf_bytes: bytes) -> LoanState:
         if match:
             value = match.group(1).replace(",", "")
             candidate = float(value)
-            # Sanity check: monthly income should be between 5,000 and 10,000,000
             if 5000 <= candidate <= 10000000:
                 extracted = candidate
                 break

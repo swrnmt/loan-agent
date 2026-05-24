@@ -1,5 +1,9 @@
 import streamlit as st
 from main import run_pipeline
+from database import init_db, save_application, get_all_applications
+
+# Initialize the database on startup
+init_db()
 
 st.set_page_config(page_title="Loan Application Agent", page_icon="🏦")
 
@@ -35,6 +39,7 @@ if st.button("Submit Application"):
 
             pdf_bytes = uploaded_file.read()
             result = run_pipeline(form_data, pdf_bytes)
+            save_application(result)
 
         # --- Show Results ---
         st.subheader("Application Result")
@@ -46,8 +51,39 @@ if st.button("Submit Application"):
 
         st.markdown(f"**Reason:** {result['reason']}")
         st.markdown(f"**EMI:** ₹{result['emi']:,.0f}/month")
-        st.markdown(f"**OCR Extracted Income:** ₹{result['ocr_extracted_income']:,.0f}" if result['ocr_extracted_income'] else "**OCR Extracted Income:** Could not extract")
+        if result["ocr_extracted_income"]:
+            st.markdown(f"**OCR Extracted Income:** ₹{result['ocr_extracted_income']:,.0f}")
+        else:
+            st.markdown("**OCR Extracted Income:** Could not extract")
+
+        # --- Audit Trail ---
+        st.subheader("Audit Trail")
+        st.markdown(f"""
+**Intake Agent:** Received application from {result['applicant_name']}. Stated income ₹{result['stated_income']:,.0f}, loan request ₹{result['loan_amount']:,.0f} over {result['loan_tenure_months']} months.
+
+**OCR Agent:** {'Extracted income of ₹' + f"{result['ocr_extracted_income']:,.0f}" + f" from salary slip (confidence: {result['ocr_confidence']:.0%})." if result['ocr_extracted_income'] else 'Could not extract income from salary slip. Falling back to stated income.'}
+
+**Decision Agent:** Calculated EMI of ₹{result['emi']:,.0f}/month. Applied 3x income rule. Decision: **{result['decision']}**. {result['reason']}
+        """)
 
         # --- Full State (for debugging) ---
         with st.expander("See full application state"):
-            st.json(result)
+            display_state = {k: v for k, v in result.items() if k != "pdf_bytes"}
+            st.json(display_state)
+
+# --- Application History ---
+st.divider()
+st.subheader("Application History")
+records = get_all_applications()
+if records:
+    history = [{
+        "Name": r.applicant_name,
+        "Income": f"₹{r.stated_income:,.0f}",
+        "Loan": f"₹{r.loan_amount:,.0f}",
+        "EMI": f"₹{r.emi:,.0f}" if r.emi else "-",
+        "Decision": r.decision,
+        "Time": r.created_at.strftime("%d %b %Y, %H:%M")
+    } for r in records]
+    st.dataframe(history, use_container_width=True)
+else:
+    st.info("No applications submitted yet.")
