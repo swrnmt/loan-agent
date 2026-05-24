@@ -49,6 +49,7 @@ https://loan-agent.streamlit.app
 | Deployment | Streamlit Cloud |
 
 ## Project Structure
+```
 loan-agent/
 ├── agents/
 │   ├── intake_agent.py        # Structures form input into state
@@ -66,7 +67,7 @@ loan-agent/
 ├── test_profiles.py           # 10 profile simulation test
 ├── packages.txt               # System dependencies for Streamlit Cloud
 └── requirements.txt
-
+```
 ## How to run locally
 
 ```bash
