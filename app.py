@@ -32,7 +32,7 @@ if st.session_state.screen == "form":
     if st.session_state.show_about:
         st.info("""
 **What is this?**
-An agentic AI system that automates loan application processing end to end — the kind of system banks are actually deploying right now.
+An agentic AI system that automates loan application processing end to end.
 
 **7 agents, one pipeline:**
 1. Intake Agent — structures your form input
