@@ -11,36 +11,42 @@ if "result" not in st.session_state:
     st.session_state.result = None
 if "screen" not in st.session_state:
     st.session_state.screen = "form"
+if "show_about" not in st.session_state:
+    st.session_state.show_about = False
+if "show_history" not in st.session_state:
+    st.session_state.show_history = False
 
 # =====================
 # SCREEN 1: FORM
 # =====================
 if st.session_state.screen == "form":
 
-    st.markdown("""
-    <div style='text-align: center; padding: 2rem 0 1rem 0;'>
-        <h1 style='font-size: 2.5rem;'>🏦 Loan Application Agent</h1>
-        <p style='font-size: 1.1rem; color: gray; max-width: 600px; margin: auto;'>
-            An agentic AI system that automates loan processing end to end.
-            Upload your salary slip, fill in your details, and get an instant
-            decision with a full audit trail and downloadable report.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    # --- Header ---
+    col_title, col_about = st.columns([5, 1])
+    with col_title:
+        st.markdown("## 🏦 Loan Application Agent")
+    with col_about:
+        if st.button("About"):
+            st.session_state.show_about = not st.session_state.show_about
 
-    st.divider()
+    if st.session_state.show_about:
+        st.info("""
+**What is this?**
+An agentic AI system that automates loan application processing end to end — the kind of system banks are actually deploying right now.
 
-    with st.expander("⚙️ How it works — 7 agents, one pipeline"):
-        st.markdown("""
-        1. **Intake Agent** — reads and structures your form input
-        2. **OCR Agent** — extracts your income directly from the salary slip PDF
-        3. **Verification Agent** — cross-checks stated income vs extracted income
-        4. **Risk Agent** — computes debt-to-income ratio and assigns a risk tier
-        5. **Fraud Agent** — detects suspicious patterns and assigns a fraud score
-        6. **Decision Agent** — approves, rejects, or escalates to human review
-        7. **Report Agent** — generates a downloadable PDF audit report with AI-written officer notes
+**7 agents, one pipeline:**
+1. Intake Agent — structures your form input
+2. OCR Agent — reads income from your salary slip PDF
+3. Verification Agent — cross-checks stated vs extracted income
+4. Risk Agent — computes debt-to-income ratio and risk tier
+5. Fraud Agent — detects suspicious patterns
+6. Decision Agent — approves, rejects, or escalates to human review
+7. Report Agent — generates a PDF audit report with AI-written officer notes
+
+**Built with:** LangGraph, Groq (Llama 3.3 70B), Tesseract OCR, SQLite, Streamlit
         """)
 
+    st.divider()
     st.markdown("### Applicant Details")
 
     col1, col2 = st.columns(2)
@@ -116,30 +122,37 @@ if st.session_state.screen == "form":
 
     # --- Application History ---
     st.divider()
-    st.markdown("### Application History")
-    records = get_all_applications()
-    if records:
-        history = []
-        for r in records:
-            if r.decision == "Approved":
-                badge = "🟢 Approved"
-            elif r.decision == "Manual Review":
-                badge = "🟡 Manual Review"
-            else:
-                badge = "🔴 Rejected"
-            history.append({
-                "Name": r.applicant_name,
-                "Income": f"₹{r.stated_income:,.0f}",
-                "Loan": f"₹{r.loan_amount:,.0f}",
-                "EMI": f"₹{r.emi:,.0f}" if r.emi else "-",
-                "Risk": r.risk_tier if r.risk_tier else "-",
-                "Fraud": f"{r.fraud_score:.0%}" if r.fraud_score is not None else "-",
-                "Decision": badge,
-                "Time": r.created_at.strftime("%d %b, %H:%M")
-            })
-        st.dataframe(history, use_container_width=True)
-    else:
-        st.info("No applications submitted yet.")
+    col_hist, col_toggle = st.columns([5, 1])
+    with col_hist:
+        st.markdown("### Application History")
+    with col_toggle:
+        if st.button("Show" if not st.session_state.show_history else "Hide"):
+            st.session_state.show_history = not st.session_state.show_history
+
+    if st.session_state.show_history:
+        records = get_all_applications()
+        if records:
+            history = []
+            for r in records:
+                if r.decision == "Approved":
+                    badge = "🟢 Approved"
+                elif r.decision == "Manual Review":
+                    badge = "🟡 Manual Review"
+                else:
+                    badge = "🔴 Rejected"
+                history.append({
+                    "Name": r.applicant_name,
+                    "Income": f"₹{r.stated_income:,.0f}",
+                    "Loan": f"₹{r.loan_amount:,.0f}",
+                    "EMI": f"₹{r.emi:,.0f}" if r.emi else "-",
+                    "Risk": r.risk_tier if r.risk_tier else "-",
+                    "Fraud": f"{r.fraud_score:.0%}" if r.fraud_score is not None else "-",
+                    "Decision": badge,
+                    "Time": r.created_at.strftime("%d %b, %H:%M")
+                })
+            st.dataframe(history, use_container_width=True)
+        else:
+            st.info("No applications submitted yet.")
 
 # =====================
 # SCREEN 2: RESULT
@@ -163,7 +176,7 @@ elif st.session_state.screen == "result":
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("EMI", f"₹{result['emi']:,.0f}/month")
+        st.metric("Monthly EMI", f"₹{result['emi']:,.0f}")
     with col2:
         st.metric("Risk Tier", result["risk_tier"])
     with col3:
