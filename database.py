@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
+import sqlite3
 
 Base = declarative_base()
 engine = create_engine("sqlite:///loan_applications.db")
@@ -29,8 +30,33 @@ class LoanApplication(Base):
     reason = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+def migrate_db():
+    conn = sqlite3.connect("loan_applications.db")
+    cursor = conn.cursor()
+
+    cursor.execute("PRAGMA table_info(applications)")
+    existing_columns = [row[1] for row in cursor.fetchall()]
+
+    new_columns = {
+        "income_match": "TEXT",
+        "income_mismatch_pct": "REAL",
+        "verification_confidence": "REAL",
+        "debt_to_income_ratio": "REAL",
+        "emi_burden_pct": "REAL",
+        "risk_tier": "TEXT",
+        "fraud_score": "REAL",
+    }
+
+    for column, col_type in new_columns.items():
+        if column not in existing_columns:
+            cursor.execute(f"ALTER TABLE applications ADD COLUMN {column} {col_type}")
+
+    conn.commit()
+    conn.close()
+
 def init_db():
     Base.metadata.create_all(engine)
+    migrate_db()
 
 def save_application(state: dict):
     session = Session()
