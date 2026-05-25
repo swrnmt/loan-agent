@@ -107,12 +107,3 @@ Expected results: 5 Approved, 3 Manual Review, 2 Rejected
 | EMI burden between 30% and 50% | Approved with caution (Medium Risk) |
 | EMI burden above 50% | Rejected (High Risk) |
 
-## Interview Talking Points
-
-**The Problem:** Loan processing in Indian banks is still semi-manual. KYC verification, income checks, and risk scoring involve multiple teams, multiple documents, and multiple days.
-
-**The Architecture:** Seven specialized agents, each with one job. LangGraph manages state transitions between them. Every decision is explainable — the system tells you why it decided, not just what it decided.
-
-**The Hard Part:** Hallucination control. An LLM saying a loan is approved when it should not be is a serious problem in banking. Every LLM output is validated against a structured schema before passing to the next agent, and confidence thresholds trigger human escalation instead of autonomous high-stakes decisions.
-
-**The Result:** A fully deployed system that processes a simulated loan application end-to-end in under 30 seconds — including OCR extraction, income verification, fraud detection, risk scoring, and PDF report generation with LLM-written officer notes.
